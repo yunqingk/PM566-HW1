@@ -1,28 +1,195 @@
 ---
-title: ""
-author: ""
-format:
-  html:
-    embed-resources: true
+title: "Assignment 01"
+author: "Karisa Ke"
+format: html
+embed-resources: true
+editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
 ```{r}
-1 + 1
+library(data.table)
+data_2002 <- fread("/Users/yunqingke/Downloads/PM2.5_2002.csv")
+data_2022 <- fread("/Users/yunqingke/Downloads/PM2.5_2022.csv")
 ```
 
-You can add options to executable code like this
-
 ```{r}
-#| echo: false
-2 * 2
+dim(data_2002)
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+head(data_2002)
+```
+
+```{r}
+tail(data_2002)
+```
+
+```{r}
+str(data_2002)
+```
+
+```{r}
+dim(data_2022)
+```
+
+```{r}
+head(data_2022)
+```
+
+```{r}
+tail(data_2022)
+```
+
+```{r}
+str(data_2022)
+```
+
+```{r}
+summary(data_2002$'Daily Mean PM2.5 Concentration')
+```
+
+```{r}
+summary(data_2022$'Daily Mean PM2.5 Concentration')
+```
+
+Summary: There are 15976 rows and 20 columns in the data_2002 dataset. There are 56140 rows and 20 columns in the data_2022 dataset. The variable names and types are the same for both datasets.
+
+```{r}
+combined_data <- rbind(data_2002, data_2022)
+```
+
+```{r}
+dim(combined_data)
+```
+
+```{r}
+combined_data$year <- as.integer(substr(combined_data$Date, 7, 10))
+
+```
+
+```{r}
+dim(combined_data)
+```
+
+```{r}
+head(combined_data)
+```
+
+```{r}
+tail(combined_data)
+```
+
+```{r}
+names(combined_data)[names(combined_data) == "Daily Mean PM2.5 Concentration"] <- "PM2.5"
+```
+
+```{r}
+head(combined_data)
+```
+
+```{r}
+library(leaflet)
+```
+
+```{r}
+# Create a color column based on the year
+combined_data$marker_color <- ifelse(combined_data$year == 2002, "blue", "red")
+
+# Create a basic map with markers and a legend
+map <- leaflet(combined_data) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lng = ~SITE_LONGITUDE,
+    lat = ~SITE_LATITUDE,
+    color = ~marker_color,
+    radius = 4,
+    label = ~year
+) %>%
+  addLegend(
+    values = c("blue", "red"),
+    colors = c("blue", "red"),
+    labels = c("2002", "2022"),
+    title = "Year"
+)
+
+# Print the map
+map
+```
+
+The monitoring sites are mainly located by the coastline.
+
+```{r}
+# Check for missing values
+missing_values <- sum(is.na(combined_data$PM2.5))
+```
+
+```{r}
+missing_values
+```
+
+```{r}
+# Check for implausible values (e.g., negative values)
+implausible_values <- sum(combined_data$PM2.5 < 0)
+```
+
+```{r}
+implausible_values
+```
+
+```{r}
+# Calculate proportions
+total_records <- nrow(combined_data)
+missing_proportion <- missing_values / total_records
+implausible_proportion <- implausible_values / total_records
+```
+
+```{r}
+missing_proportion
+```
+
+```{r}
+implausible_proportion
+```
+
+```{r}
+cat("Missing PM2.5 values:", missing_proportion * 100, "%\n")
+cat("Implausible PM2.5 values:", implausible_proportion * 100, "%\n")
+```
+
+```{r}
+# at state level
+state_summary <- combined_data[, .(Average_PM2.5 = mean(PM2.5, na.rm = TRUE)), by = .(year)]
+
+# Line plot of PM2.5 concentrations over the years
+library(ggplot2)
+ggplot(state_summary, aes(x = year, y = Average_PM2.5, group = 1)) +
+  geom_line() +
+  labs(x = "Year", y = "Average PM2.5 Concentration (µg/m³)", title = "Average PM2.5 Concentrations in California (2002-2022)")
+```
+
+The line plot shows the average PM2.5 concentrations in California from 2002 to 2022, showing that the average PM2.5 level was decreasing over the time.
+
+```{r}
+# at county level
+library(ggplot2)
+ggplot(combined_data, aes(x = combined_data$COUNTY, y = PM2.5, fill = factor(year))) +
+  geom_boxplot() +
+  labs(x = "County", y = "PM2.5 Concentration (µg/m³)", title = "PM2.5 Concentrations by County (2002 vs. 2022)") +
+  scale_fill_manual(values = c("blue", "red")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The boxplot compares PM2.5 concentrations across different counties in California for the years 2002 and 2022. There are several counties that have extremely high PM2.5 levels.
+
+```{r}
+# site in LA
+la_data <- combined_data[COUNTY == "Los Angeles"]
+
+# Histogram of PM2.5 concentrations at specific sites in Los Angeles for 2002 and 2022
+ggplot(la_data, aes(x = PM2.5, fill = factor(year))) +
+  geom_histogram(binwidth = 5, position = "dodge") +
+  labs(x = "PM2.5 Concentration (µg/m³)", y = "Frequency", title = "PM2.5 Concentrations at Specific Sites in Los Angeles (2002 vs. 2022)") +
+  scale_fill_manual(values = c("blue", "red"))
+```
+
+The histograms show the distribution of PM2.5 concentrations at specific monitoring sites in Los Angeles for the years 2002 and 2022. We can see that overall the year of 2022 has much high PM2.5 levels than the year of 2002.
